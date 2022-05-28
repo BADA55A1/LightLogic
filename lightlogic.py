@@ -12,7 +12,7 @@ class Device:
 	
 
 class Sensor(Device):
-	def set_action(self, action_callback):
+	def setActionCallback(self, action_callback):
 		self.action_callback = action_callback
 
 	def _process_msg(self, msg_struct):
@@ -77,7 +77,8 @@ class Styrbar(Sensor):
 	def _process_msg(self, msg_struct):
 		if 'action' in msg_struct:
 			self._state = self.Keys[msg_struct['action']]
-			self.action_callback(self._state)
+			if self.action_callback is not None:
+				self.action_callback(self._state)
 		# print(msg_struct)
 		# print(self.name + ": " + str(self._state) )
 
@@ -164,3 +165,19 @@ class TradfriBulb(Output):
 		if color_temp is not None:
 			out['color_temp_step'] = color_temp
 		self._set(out)
+
+
+class SonoffMotion(Sensor):
+	def __init__(self, reference, name, mqtt_client):
+		Sensor.__init__(self, reference, name, mqtt_client)
+		self._state = None
+	
+	def _process_msg(self, msg_struct):
+		if 'occupancy' in msg_struct:
+			self._state = msg_struct['occupancy']
+			if self.action_callback is not None:
+				self.action_callback(self._state)
+		print(self.name + ": " + str(self._state) )
+
+	def getState(self):
+		return self._state
