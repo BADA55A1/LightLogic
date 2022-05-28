@@ -111,18 +111,20 @@ c_temp_p = 0
 s = sched.scheduler(time.time, time.sleep)
 s_event = None
 
+def clear_sceduler_queue(scheduler):
+	for event in scheduler.queue():
+		scheduler.cancel(event)
+
 def remote_callback(var):
 	global c_temp_p, color_temp, mode_power, s, s_event
 	if var == ll.Styrbar.State.UP:
 		set_lights(power=True)
-		if s_event is not None:
-			s.cancel(s_event)
+		clear_sceduler_queue(s)
 		mode_power = PowerMode.ON_MANUAL
 
 	elif var == ll.Styrbar.State.DOWN:
 		set_lights(power=False)
-		if s_event is not None:
-			s.cancel(s_event)
+		clear_sceduler_queue(s)
 		mode_power = PowerMode.OFF
 
 	elif var == ll.Styrbar.State.LEFT:
@@ -153,10 +155,10 @@ def motion_callback(var):
 	if mode_power is not PowerMode.ON_MANUAL:
 		if(var):
 			set_lights(power=True, brightness=180)
+			clear_sceduler_queue(s)
 			mode_power = PowerMode.ON_AUTO
 		else:
-			if s_event is not None:
-				s.cancel(s_event)
+			clear_sceduler_queue(s)
 			s_event = s.enter(5*60, 1, disable_lights)
 			s.run()
 
