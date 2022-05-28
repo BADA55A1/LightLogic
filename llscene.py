@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 import lightlogic as ll
 
 
-mqtt_host = "192.168.1.111"
+mqtt_host = "localhost"
 mqtt_port = 1883
 
 time_day2cold = '19:00' 
@@ -112,39 +112,37 @@ s = sched.scheduler(time.time, time.sleep)
 s_event = None
 
 def remote_callback(var):
-	print(var)
 	global c_temp_p, color_temp, mode_power, s, s_event
-	match var:
-		case ll.Styrbar.State.UP:
-			set_lights(power=True)
-			if s_event is not None:
-				s.cancel(s_event)
-			mode_power = PowerMode.ON_MANUAL
+	if var == ll.Styrbar.State.UP:
+		set_lights(power=True)
+		if s_event is not None:
+			s.cancel(s_event)
+		mode_power = PowerMode.ON_MANUAL
 
-		case ll.Styrbar.State.DOWN:
-			set_lights(power=False)
-			if s_event is not None:
-				s.cancel(s_event)
-			mode_power = PowerMode.OFF
+	elif var == ll.Styrbar.State.DOWN:
+		set_lights(power=False)
+		if s_event is not None:
+			s.cancel(s_event)
+		mode_power = PowerMode.OFF
 
-		case ll.Styrbar.State.LEFT:
-			if c_temp_p > 0:
-				c_temp_p -= 1
-				set_lights(color_temp = int(color_temp[c_temp_p]) )
+	elif var == ll.Styrbar.State.LEFT:
+		if c_temp_p > 0:
+			c_temp_p -= 1
+			set_lights(color_temp = int(color_temp[c_temp_p]) )
 
-		case ll.Styrbar.State.RIGHT:
-			if c_temp_p < 4:
-				c_temp_p += 1
-				set_lights(color_temp = int(color_temp[c_temp_p]) )
+	elif var == ll.Styrbar.State.RIGHT:
+		if c_temp_p < 4:
+			c_temp_p += 1
+			set_lights(color_temp = int(color_temp[c_temp_p]) )
 
-		case ll.Styrbar.State.UP_HOLD:
-			move_lights(brightness=20)
+	elif var == ll.Styrbar.State.UP_HOLD:
+		move_lights(brightness=20)
 
-		case ll.Styrbar.State.DOWN_HOLD:
-			move_lights(brightness=-20)
+	elif var == ll.Styrbar.State.DOWN_HOLD:
+		move_lights(brightness=-20)
 
-		case ll.Styrbar.State.UP_DOWN_RELEASE:
-			move_lights(brightness=0)
+	elif var == ll.Styrbar.State.UP_DOWN_RELEASE:
+		move_lights(brightness=0)
 
 def disable_lights():
 	set_lights(power=False)
