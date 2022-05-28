@@ -108,19 +108,30 @@ color_temp = [
 
 c_temp_p = 0
 
+s = sched.scheduler(time.time, time.sleep)
+s_event = None
+
 def remote_callback(var):
 	print(var)
-	global c_temp_p, color_temp
+	global c_temp_p, color_temp, mode_power, s, s_event
 	match var:
 		case ll.Styrbar.State.UP:
 			set_lights(power=True)
+			if s_event is not None:
+				s.cancel(s_event)
+			mode_power = PowerMode.ON_MANUAL
+
 		case ll.Styrbar.State.DOWN:
 			set_lights(power=False)
+			if s_event is not None:
+				s.cancel(s_event)
+			mode_power = PowerMode.OFF
 
 		case ll.Styrbar.State.LEFT:
 			if c_temp_p > 0:
 				c_temp_p -= 1
 				set_lights(color_temp = int(color_temp[c_temp_p]) )
+
 		case ll.Styrbar.State.RIGHT:
 			if c_temp_p < 4:
 				c_temp_p += 1
@@ -128,14 +139,34 @@ def remote_callback(var):
 
 		case ll.Styrbar.State.UP_HOLD:
 			move_lights(brightness=20)
+
 		case ll.Styrbar.State.DOWN_HOLD:
 			move_lights(brightness=-20)
+
 		case ll.Styrbar.State.UP_DOWN_RELEASE:
 			move_lights(brightness=0)
 
+def disable_lights():
+	set_lights(power=False)
+	mode_power = PowerMode.OFF
+
+def motion_callback(var):
+	global mode_power, s, s_event
+	if mode_power is not PowerMode.ON_MANUAL:
+		if(var):
+			set_lights(power=True, brightness=180)
+			mode_power = PowerMode.ON_AUTO
+		else:
+			if s_event is not None:
+				s.cancel(s_event)
+			s_event = s.enter(5*60, 1, disable_lights)
+			s.run()
+
+	
 
 remote_a.setActionCallback(remote_callback)
+motion_sensor.setActionCallback(motion_callback)
 
-client.loop_forever()
-# client.loop_start()
-# client_a.loop_forever()
+client.loop_start()
+client_a.loop_forever()
+# client.loop_forever()
