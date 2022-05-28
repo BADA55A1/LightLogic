@@ -87,6 +87,13 @@ class Styrbar(Sensor):
 
 
 class TradfriBulb(Output):
+	BRIGHTNESS_MIN = 0
+	BRIGHTNESS_MAX = 254
+
+	TEMPERATURE_COLD = 250
+	TEMPERATURE_NEUTRAL = 370
+	TEMPERATURE_WARM = 454
+
 	class Temp(Enum):
 		COOLEST = 0
 		COOL = 1
@@ -104,6 +111,8 @@ class TradfriBulb(Output):
 
 	def __init__(self, reference, name, mqtt_client):
 		Output.__init__(self, reference, name, mqtt_client)
+		self.brightness = 0
+		self.color_temp = 0
 
 	def set(
 		self,
@@ -112,18 +121,21 @@ class TradfriBulb(Output):
 		color_hex = None,
 		color_rgb = None,
 		color_temp = None,
-		transition = None
+		transition = None,
+		brightness_percentage = None,
+		color_temp_percentage = None
 	):
 		out = {}
 
 		if power is not None:
-			if power == 0: 
-				out['state'] = 'OFF'
-			else:
+			if power: 
 				out['state'] = 'ON'
+			else:
+				out['state'] = 'OFF'
 			
 		if brightness is not None:
 			out['brightness'] = brightness
+			self.brightness = brightness
 
 		if color_hex is not None:
 			out['color'] = {'hex': color_hex}
@@ -134,11 +146,20 @@ class TradfriBulb(Output):
 		if color_temp is not None:
 			if isinstance(color_temp, int):
 				out['color_temp'] = color_temp
+				self.color_temp = color_temp
 			else:
 				out['color_temp'] = self.TempKeys[color_temp]
 			
 		if transition is not None:
 			out['transition'] = transition
+			
+		if brightness_percentage is not None:
+			self.brightness = self.brightness * (brightness_percentage / 100)
+			out['brightness'] = self.brightness
+			
+		if color_temp_percentage is not None:
+			self.color_temp = self.color_temp * (color_temp_percentage / 100)
+			out['color_temp'] = self.color_temp
 		
 		self._set(out)
 	
