@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import datetime
 import sched, time
 from enum import Enum
 import paho.mqtt.client as mqtt
@@ -112,7 +113,7 @@ s = sched.scheduler(time.time, time.sleep)
 s_event = None
 
 def clear_sceduler_queue(scheduler):
-	for event in scheduler.queue():
+	for event in scheduler.queue:
 		scheduler.cancel(event)
 
 def remote_callback(var):
@@ -154,9 +155,10 @@ def motion_callback(var):
 	global mode_power, s, s_event
 	if mode_power is not PowerMode.ON_MANUAL:
 		if(var):
-			set_lights(power=True, brightness=180)
-			clear_sceduler_queue(s)
-			mode_power = PowerMode.ON_AUTO
+			if datetime.datetime.now().time() >= datetime.time(20,30) and datetime.datetime.now().time() <= datetime.time(6,00):
+				set_lights(power=True, brightness=180)
+				clear_sceduler_queue(s)
+				mode_power = PowerMode.ON_AUTO
 		else:
 			clear_sceduler_queue(s)
 			s_event = s.enter(5*60, 1, disable_lights)
