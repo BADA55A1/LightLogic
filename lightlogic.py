@@ -196,9 +196,9 @@ class SonoffMotion(Sensor):
 	def _process_msg(self, msg_struct):
 		if 'occupancy' in msg_struct:
 			self._state = msg_struct['occupancy']
+			print(self.name + ": " + str(self._state) )
 			if self.action_callback is not None:
 				self.action_callback(self._state)
-		print(self.name + ": " + str(self._state) )
 
 	def getState(self):
 		return self._state
