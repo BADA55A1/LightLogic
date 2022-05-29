@@ -19,6 +19,7 @@ class Sensor(Device):
 		self.action_callback
 
 	def on_callback(self, client, userdata, message):
+		print(self.name + ": " + str(message.payload.decode("utf-8")) )
 		self._process_msg(json.loads(message.payload) )
 
 	def __init__(self, reference, name, mqtt_client):
@@ -37,7 +38,7 @@ class Output(Device):
 	def _set(self, property):
 		address = 'zigbee2mqtt/' + self.reference + '/set'
 		self.client.publish(address, json.dumps(property) )
-		print(json.dumps(property))
+		print(self.name + ": " + json.dumps(property))
 
 
 class Styrbar(Sensor):
@@ -194,9 +195,10 @@ class SonoffMotion(Sensor):
 		self._state = None
 	
 	def _process_msg(self, msg_struct):
+		# print(self.name + ": " + str(msg_struct) )
 		if 'occupancy' in msg_struct:
 			self._state = msg_struct['occupancy']
-			print(self.name + ": " + str(self._state) )
+			# print(self.name + ": " + str(self._state) )
 			if self.action_callback is not None:
 				self.action_callback(self._state)
 

@@ -1,0 +1,162 @@
+{
+	"mqtt_host": "192.168.1.111",
+	"mqtt_port": 1883,
+
+	"devices": {
+		"remote_controls": {
+			"remote_a": "0x50325ffffed24be5"
+		},
+		"motion_sensors": {
+			"motion": "0x00124b0025092707"
+		},
+		"bulbs": {
+			"desk_a": "0x04cd15fffebf6cd8",
+			"desk_b": "0x50325ffffeea697c",
+			"bed":    "0x04cd15fffe6bd611",
+			"stairs": "0x2c1165fffea8a954"
+		}
+	},
+
+	"temp_presets": {
+		"blue":         { "color_hex": "#0000FF" },
+		"cold_4":       { "color_hex": "#3333FF" },
+		"cold_3":       { "color_hex": "#6666FF" },
+		"cold_2":       { "color_hex": "#CCCCFF" },
+		"cold_1":       { "color_hex": "#FFFFFF" },
+		"cold":         { "color_temp": 250	},
+		"cold_neutral": { "color_temp": 310	},
+		"neutral":      { "color_temp": 370	},
+		"neutral_warm": { "color_temp": 412	},
+		"warm":         { "color_temp": 454	},
+		"warm_1":       { "color_hex": "#FFB030" },
+		"warm_2":       { "color_hex": "#FFA018" },
+		"warm_3":       { "color_hex": "#FF9010" },
+		"warm_4":       { "color_hex": "#FF7700" },
+		"red":          { "color_hex": "#FF0000" }
+	},
+
+	"presets": {
+		"off": {
+			"settings": {
+				"power": false
+			}
+		},
+		"cold_100": {
+			"temp_preset": "cold",
+			"settings": {
+				"brightness": 254
+			}
+		},
+		"neutral_100": {
+			"temp_preset": "neutral",
+			"settings": {
+				"brightness": 254
+			}
+		},
+		"neutral_85": {
+			"temp_preset": "neutral",
+			"settings": {
+				"brightness": 216
+			}
+		},
+		"warm_100": {
+			"temp_preset": "warm",
+			"settings": {
+				"brightness": 254
+			}
+		},
+		"warm_80": {
+			"temp_preset": "warm",
+			"settings": {
+				"brightness": 203
+			}
+		},
+		"warmer_60": {
+			"temp_preset": "warm_1",
+			"settings": {
+				"brightness": 152
+			}
+		},
+		"warmest_30": {
+			"temp_preset": "warm_2",
+			"settings": {
+				"brightness": 76
+			}
+		},
+		"red_10": {
+			"temp_preset": "warm_4",
+			"settings": {
+				"brightness": 25
+			}
+		}
+	},
+
+	"time_modes": {
+		"day": {
+			"start_time": "07:00",
+			"astro_args": "sunrise",
+			"presets": [
+				"neutral_100"
+			],
+			"manual_on_preset": "neutral_100",
+			"auto_on_preset": null,
+			"on_time_preset": "off"
+		},
+		"sunset": {
+			"start_time": "19:00",
+			"astro_args": "sunset",
+			"presets": [
+				"cold_100",
+				"neutral_100"
+			],
+			"manual_on_preset": "cold_100",
+			"auto_on_preset": "cold_100",
+			"on_time_preset": "neutral_100"
+		},
+		"evening": {
+			"start_time": "20:00",
+			"astro_args": null,
+			"presets": [
+				"neutral_85",
+				"neutral_100"
+			],
+			"manual_on_preset": "neutral_85",
+			"auto_on_preset": "neutral_85",
+			"on_time_preset": "neutral_85"
+		},
+		"evening_late": {
+			"start_time": "22:00",
+			"astro_args": "sunset",
+			"presets": [
+				"warm_80",
+				"warm_100",
+				"neutral_100"
+			],
+			"manual_on_preset": "warm_80",
+			"auto_on_preset": "warm_80",
+			"on_time_preset": "warm_80"
+		},
+		"night": {
+			"start_time": "00:00",
+			"astro_args": "sunset",
+			"presets": [
+				"red_10",
+				"warmest_30",
+				"warmer_60",
+				"warm_80",
+				"warm_100",
+				"neutral_100"
+			],
+			"manual_on_preset": "red_10",
+			"auto_on_preset": "red_10",
+			"on_time_preset": "warmest_30"
+		}
+	},
+
+	"times": {
+		"manual": 1,
+		"auto_on": 3,
+		"auto_switch": 360
+	}
+
+}

@@ -1,178 +1,182 @@
 #!/usr/bin/python
 
-import datetime
-import sched, time
-from enum import Enum
-import paho.mqtt.client as mqtt
+import json
 import lightlogic as ll
+import paho.mqtt.client as mqtt
+from enum import Enum
 
 
-mqtt_host = "localhost"
-mqtt_port = 1883
 
-time_day2cold = '19:00' 
-time_cold2neutral = '20:00'
-time_neutral2warm = '22:00'
-time_warm2night = '00:00'
-time_night2day = '07:00'
+class Scene:
+	def setPreset(self, preset):
+		pass
+	def setLights(self, payload): pass
 
-bulb_list = {
-	'desk_a': '0x04cd15fffebf6cd8',
-	'desk_b': '0x50325ffffeea697c',
-	'bed':    '0x04cd15fffe6bd611',
-	'stairs': '0x2c1165fffea8a954'
-}
+	class PowerMode(Enum):
+		OFF = 0
+		ON = 1
+		ON_AUTO = 2
+		
+	def readConfig(self, config):
+		self.config = config
 
-addr_remote_a = '0x50325ffffed24be5'
-addr_motion_sensor = '0x00124b0025092707'
+		self.temp = self.config['temp_presets']
+		self.presets = self.config['presets']
+		self.time_modes = self.config['time_modes']
 
-class TimeMode(Enum):
-	DAY = 0
-	EVENING_COLD = 1
-	EVENING_NEUTRAL = 2
-	EVENING_WARM = 3
-	NIGHT = 4
+		self.t_manual = self.config['times']['manual']
+		self.t_auto = self.config['times']['auto_on']
+		self.t_auto_switch = self.config['times']['auto_switch']
 
-class LocationMode(Enum):
-	ALL = 0
-	STAIRS = 1
-	STAIRS_DESK = 2
-	DESK = 3
-	BED = 4
+	def __init__(self, config):
+		self.readConfig(config)
 
-class MotionMode(Enum):
-	IDDLE = 0
-	ACTIVE = 1
-	LONG_ACTIVE = 2
+		self.main_client = mqtt.Client()
+		self.main_client.connect(self.config['mqtt_host'], port=self.config['mqtt_port'])
 
-class LogicMode(Enum):
-	AUTO = 0
-	MANUAL = 1
+		self.motion_sensor = ll.SonoffMotion(
+			self.config['devices']['motion_sensors']['motion'],
+			"Motion Sensor",
+			self.main_client
+		)
 
-class PowerMode(Enum):
-	OFF = 0
-	ON_AUTO = 1
-	ON_MANUAL = 2
+		self.lights = {}
+		if 'bulbs' in self.config['devices']:
+			for bulb in self.config['devices']['bulbs']:
+				self.lights[bulb] = ll.TradfriBulb(
+					self.config['devices']['bulbs'][bulb],
+					bulb,
+					self.main_client
+				)
 
-# class Mode:
-# 	def __init__(self, brightness):
-
-
-# Init MQTT
-client =mqtt.Client()
-client.connect(mqtt_host, port=mqtt_port)
-
-client_a =mqtt.Client()
-client_a.connect(mqtt_host, port=mqtt_port)
-
-# Connecting
-remote_a = ll.Styrbar(addr_remote_a, "Remote A", client)
-motion_sensor = ll.SonoffMotion(addr_motion_sensor, "Motion Sensor", client_a)
-
-lamp = {}
-for bulb in bulb_list:
-	lamp[bulb] = ll.TradfriBulb(bulb_list[bulb], bulb, client)
-
-[print(l) for l in lamp]
-
-mode_time = TimeMode.DAY
-mode_location = LocationMode.ALL
-mode_motion = MotionMode.IDDLE
-mode_logic = LogicMode.AUTO
-mode_power = PowerMode.OFF
-
-
-def set_lights(
-	power = None,
-	brightness = None,
-	color_temp = None
-):
-	for l in lamp:
-		print(l)
-		lamp[l].set(power=power, brightness=brightness, color_temp=color_temp, transition=2)
-
-def move_lights(
-	brightness = None,
-	color_temp = None
-):
-	for l in lamp:
-		print(l)
-		lamp[l].move(brightness = brightness, color_temp = color_temp)
-
-color_temp = [
-	ll.TradfriBulb.TEMPERATURE_COLD,
-	(ll.TradfriBulb.TEMPERATURE_COLD + ll.TradfriBulb.TEMPERATURE_NEUTRAL) / 2,
-	ll.TradfriBulb.TEMPERATURE_NEUTRAL,
-	(ll.TradfriBulb.TEMPERATURE_WARM + ll.TradfriBulb.TEMPERATURE_NEUTRAL) / 2,
-	ll.TradfriBulb.TEMPERATURE_WARM
-]
-
-c_temp_p = 0
-
-s = sched.scheduler(time.time, time.sleep)
-s_event = None
-
-def clear_sceduler_queue(scheduler):
-	for event in scheduler.queue:
-		scheduler.cancel(event)
-
-def remote_callback(var):
-	global c_temp_p, color_temp, mode_power, s, s_event
-	if var == ll.Styrbar.State.UP:
-		set_lights(power=True)
-		clear_sceduler_queue(s)
-		mode_power = PowerMode.ON_MANUAL
-
-	elif var == ll.Styrbar.State.DOWN:
-		set_lights(power=False)
-		clear_sceduler_queue(s)
-		mode_power = PowerMode.OFF
-
-	elif var == ll.Styrbar.State.LEFT:
-		if c_temp_p > 0:
-			c_temp_p -= 1
-			set_lights(color_temp = int(color_temp[c_temp_p]) )
-
-	elif var == ll.Styrbar.State.RIGHT:
-		if c_temp_p < 4:
-			c_temp_p += 1
-			set_lights(color_temp = int(color_temp[c_temp_p]) )
-
-	elif var == ll.Styrbar.State.UP_HOLD:
-		move_lights(brightness=20)
-
-	elif var == ll.Styrbar.State.DOWN_HOLD:
-		move_lights(brightness=-20)
-
-	elif var == ll.Styrbar.State.UP_DOWN_RELEASE:
-		move_lights(brightness=0)
-
-def disable_lights():
-	set_lights(power=False)
-	mode_power = PowerMode.OFF
-
-def motion_callback(var):
-	global mode_power, s, s_event
-	if mode_power is not PowerMode.ON_MANUAL:
-		if(var):
-			print("Motion: ON")
-			if datetime.datetime.now().time() >= datetime.time(20,30) or datetime.datetime.now().time() <= datetime.time(6,00):
-				set_lights(power=True, brightness=180)
-				clear_sceduler_queue(s)
-				mode_power = PowerMode.ON_AUTO
-			else:
-				print("Motion ignored")
-		else:
-			print("Motion: OFF")
-			clear_sceduler_queue(s)
-			s_event = s.enter(5*60, 1, disable_lights)
-			s.run()
-
+		self.remotes = {}
+		self.add_clients = {}
+		if 'remote_controls' in self.config['devices']:
+			for remote in self.config['devices']['remote_controls']:
+				self.add_clients['cli_' + remote] = mqtt.Client()
+				self.add_clients['cli_' + remote].connect(self.config['mqtt_host'], port=self.config['mqtt_port'])
+				self.remotes[remote] = ll.Styrbar(
+					self.config['devices']['remote_controls'][remote],
+					remote,
+					self.add_clients['cli_' + remote]
+				)
 	
+		self.power = self.PowerMode.OFF
+		self.curr_time_mode = 'evening'
 
-remote_a.setActionCallback(remote_callback)
-motion_sensor.setActionCallback(motion_callback)
+		self.curr_preset = self.time_modes[self.curr_time_mode]['presets'][0]
+		self.setPreset(self.curr_preset)
+		self.setLights( {'power': False})
 
-client.loop_start()
-client_a.loop_forever()
-# client.loop_forever()
+	def setLights(self, payload):
+		power = None
+		brightness = None
+		color_temp = None
+		color_hex = None
+		transition = None
+
+		if 'power' in payload:
+			power = payload['power']
+		if 'brightness' in payload:
+			brightness = payload['brightness']
+		if 'color_temp' in payload:
+			color_temp = payload['color_temp']
+		if 'color_hex' in payload:
+			color_hex = payload['color_hex']
+		if 'transition' in payload:
+			transition = payload['transition']
+
+		for l in self.lights:
+			self.lights[l].set(
+				power = power,
+				brightness = brightness,
+				color_temp = color_temp,
+				color_hex = color_hex,
+				transition = transition
+			)
+
+	def move_lights(
+		self,
+		brightness = None,
+		color_temp = None
+	):
+		for l in self.lights:
+			self.lights[l].move(brightness = brightness, color_temp = color_temp)
+
+	def setPreset(self, preset):
+		if preset in self.time_modes[self.curr_time_mode]['presets']:
+			self.curr_preset = preset
+			self.curr_temp = self.presets[self.curr_preset]['temp_preset']
+			self.light_all_payload = self.temp[self.curr_temp] | self.presets[self.curr_preset]['settings']
+		else:
+			raise Exception('preset: "' + preset + '" not found in time_mode "' + self.curr_time_mode + '"')
+		
+		
+
+	def nextPreset(self):
+		try:
+			next_preset = self.time_modes[self.curr_time_mode]['presets'][
+				self.time_modes[self.curr_time_mode]['presets'].index(self.curr_preset) + 1
+			]
+			self.setPreset(next_preset)
+			return True
+		except IndexError:
+			return False 
+
+
+	def prevPreset(self):
+		index = self.time_modes[self.curr_time_mode]['presets'].index(self.curr_preset) - 1
+		if index >= 0:
+			next_preset = self.time_modes[self.curr_time_mode]['presets'][index]
+			self.setPreset(next_preset)
+			return True
+		else:
+			return False 
+
+
+	def callback_remote(self, key):
+
+		if key == ll.Styrbar.State.UP:
+			if self.power == self.PowerMode.OFF:
+				self.setLights({'power': 'True',} | self.light_all_payload)
+			else:
+				if self.nextPreset():
+					self.setLights(self.light_all_payload)
+			self.power = self.PowerMode.ON
+
+		elif key == ll.Styrbar.State.DOWN:
+			if self.power != self.PowerMode.OFF:
+				if self.prevPreset():
+					self.setLights(self.light_all_payload)
+				else:
+					self.setLights( {'power': False})
+					self.power = self.PowerMode.OFF
+
+		elif key == ll.Styrbar.State.LEFT:
+			pass
+		elif key == ll.Styrbar.State.RIGHT:
+			pass
+
+		if key == ll.Styrbar.State.UP_HOLD:
+			self.move_lights(brightness=30)
+
+		elif key == ll.Styrbar.State.DOWN_HOLD:
+			self.move_lights(brightness=-30)
+
+		elif key == ll.Styrbar.State.UP_DOWN_RELEASE:
+			self.move_lights(brightness=0)
+
+
+	def run(self):
+		for remote in self.remotes:
+			self.remotes[remote].setActionCallback(self.callback_remote)
+
+		for client in self.add_clients:
+			self.add_clients[client].loop_start()
+		self.main_client.loop_forever()
+
+f = open('config.json')
+config = json.load(f)
+
+s = Scene(config)
+s.run()
