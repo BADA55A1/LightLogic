@@ -20,7 +20,7 @@ class Scene:
 	def readConfig(self, config):
 		self.config = config
 
-		self.temp = self.config['temp_presets']
+		self.temps = self.config['temp_presets']
 		self.presets = self.config['presets']
 		self.time_modes = self.config['time_modes']
 
@@ -62,12 +62,13 @@ class Scene:
 				)
 	
 		self.power = self.PowerMode.OFF
-		self.curr_time_mode = 'evening'
+		self.curr_time_mode = 'night'
 
 		self.curr_preset = self.time_modes[self.curr_time_mode]['presets'][0]
 		self.setPreset(self.curr_preset)
 		self.setLights( {'power': False})
 
+	# Lights control
 	def setLights(self, payload):
 		power = None
 		brightness = None
@@ -103,14 +104,14 @@ class Scene:
 		for l in self.lights:
 			self.lights[l].move(brightness = brightness, color_temp = color_temp)
 
+	# Presets
 	def setPreset(self, preset):
 		if preset in self.time_modes[self.curr_time_mode]['presets']:
 			self.curr_preset = preset
 			self.curr_temp = self.presets[self.curr_preset]['temp_preset']
-			self.light_all_payload = self.temp[self.curr_temp] | self.presets[self.curr_preset]['settings']
+			self.light_all_payload = self.temps[self.curr_temp] | self.presets[self.curr_preset]['settings']
 		else:
 			raise Exception('preset: "' + preset + '" not found in time_mode "' + self.curr_time_mode + '"')
-		
 		
 
 	def nextPreset(self):
@@ -133,29 +134,74 @@ class Scene:
 		else:
 			return False 
 
+	# Temp
+	def setTemp(self, temp):
+		if temp in self.temps:
+			self.curr_temp = temp
+			self.light_all_payload = self.temps[temp]
+		else:
+			raise Exception('temp: "' + temp + '" not found in "temp_presets"')
+	
+	def nextTemp(self):
+		try:
+			next_temp = list(self.temps.keys() )[
+				list(self.temps.keys() ).index(self.curr_temp) + 1
+			] 
+			self.setTemp(next_temp)
+			return True
+		except IndexError:
+			return False 
 
+
+	def prevTemp(self):
+		index = list(self.temps.keys() ).index(self.curr_temp) - 1
+		if index >= 0:
+			next_temp = list(self.temps.keys() )[index]
+			self.setTemp(next_temp)
+			return True
+		else:
+			return False 
+
+	# Misc
+	def powerON(self):
+		self.setPreset(self.curr_preset)
+		self.setLights({'power': 'True',} | self.light_all_payload)
+		self.power = self.PowerMode.ON
+
+	def powerOFF(self):
+		self.setLights( {'power': False})
+		self.power = self.PowerMode.OFF
+
+	# Callbacks
 	def callback_remote(self, key):
 
 		if key == ll.Styrbar.State.UP:
 			if self.power == self.PowerMode.OFF:
-				self.setLights({'power': 'True',} | self.light_all_payload)
+				self.powerON()
 			else:
 				if self.nextPreset():
 					self.setLights(self.light_all_payload)
-			self.power = self.PowerMode.ON
 
 		elif key == ll.Styrbar.State.DOWN:
 			if self.power != self.PowerMode.OFF:
 				if self.prevPreset():
 					self.setLights(self.light_all_payload)
 				else:
-					self.setLights( {'power': False})
-					self.power = self.PowerMode.OFF
+					self.powerOFF()
 
 		elif key == ll.Styrbar.State.LEFT:
-			pass
+			if self.power == self.PowerMode.OFF:
+				self.powerON()
+			else:
+				if self.nextTemp():
+					self.setLights(self.light_all_payload)
+
 		elif key == ll.Styrbar.State.RIGHT:
-			pass
+			if self.power == self.PowerMode.OFF:
+				self.powerON()
+			else:
+				if self.prevTemp():
+					self.setLights(self.light_all_payload)
 
 		if key == ll.Styrbar.State.UP_HOLD:
 			self.move_lights(brightness=30)
