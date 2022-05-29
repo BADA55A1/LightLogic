@@ -155,7 +155,7 @@ def motion_callback(var):
 	global mode_power, s, s_event
 	if mode_power is not PowerMode.ON_MANUAL:
 		if(var):
-			if datetime.datetime.now().time() >= datetime.time(20,30) and datetime.datetime.now().time() <= datetime.time(6,00):
+			if datetime.datetime.now().time() >= datetime.time(20,30) or datetime.datetime.now().time() <= datetime.time(6,00):
 				set_lights(power=True, brightness=180)
 				clear_sceduler_queue(s)
 				mode_power = PowerMode.ON_AUTO
