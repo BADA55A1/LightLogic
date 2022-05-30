@@ -2,6 +2,12 @@
 	"mqtt_host": "192.168.1.111",
 	"mqtt_port": 1883,
 
+	"location": {
+		"latitude": 51.1000000,
+		"longitude": 17.0333300,
+		"timezone": "Europe/Warsaw"
+	},
+
 	"devices": {
 		"remote_controls": {
 			"remote_a": "0x50325ffffed24be5"
@@ -126,7 +132,7 @@
 		},
 		"evening_late": {
 			"start_time": "22:00",
-			"astro_args": "sunset",
+			"astro_args": null,
 			"presets": [
 				"warm_80",
 				"warm_100",
@@ -137,8 +143,8 @@
 			"on_time_preset": "warm_80"
 		},
 		"night": {
-			"start_time": "00:00",
-			"astro_args": "sunset",
+			"start_time": "24:00",
+			"astro_args": null,
 			"presets": [
 				"red_10",
 				"warmest_30",
@@ -156,7 +162,8 @@
 	"times": {
 		"manual": 1,
 		"auto_on": 3,
-		"auto_switch": 360
+		"auto_switch": 240,
+		"motion_off_delay": 300
 	}
 
 }

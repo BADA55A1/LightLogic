@@ -4,13 +4,18 @@ import json
 import lightlogic as ll
 import paho.mqtt.client as mqtt
 from enum import Enum
-
+import sched, time
+from Time import Time
+import astral
+from astral.sun import sun
 
 
 class Scene:
-	def setPreset(self, preset):
-		pass
+	def setPreset(self, preset): pass
 	def setLights(self, payload): pass
+	def powerON(self): pass
+	def powerOFF(self): pass
+	def changeTimeMode(self): pass
 
 	class PowerMode(Enum):
 		OFF = 0
@@ -27,6 +32,12 @@ class Scene:
 		self.t_manual = self.config['times']['manual']
 		self.t_auto = self.config['times']['auto_on']
 		self.t_auto_switch = self.config['times']['auto_switch']
+		self.motion_off_delay = self.config['times']['motion_off_delay']
+
+		self.mode_change_time = {}
+		for mode in self.time_modes:
+			self.mode_change_time[mode] = Time(text = self.time_modes[mode]['start_time'])
+
 
 	def __init__(self, config):
 		self.readConfig(config)
@@ -60,13 +71,20 @@ class Scene:
 					remote,
 					self.add_clients['cli_' + remote]
 				)
-	
-		self.power = self.PowerMode.OFF
-		self.curr_time_mode = 'night'
 
-		self.curr_preset = self.time_modes[self.curr_time_mode]['presets'][0]
-		self.setPreset(self.curr_preset)
+		self.city = astral.LocationInfo(
+			timezone=self.config['location']['timezone'],
+			latitude=self.config['location']['latitude'],
+			longitude=self.config['location']['longitude']
+		)
+		self.scheduler = sched.scheduler(time.time, time.sleep)
+
+		self.power = self.PowerMode.OFF
 		self.setLights( {'power': False})
+		
+		self.detectTimeMode()
+		self.next_time_mode = self.curr_time_mode
+		self.changeTimeMode()
 
 	# Lights control
 	def setLights(self, payload):
@@ -162,25 +180,124 @@ class Scene:
 		else:
 			return False 
 
+	# Time mode
+	def setTimeMode(self, mode):
+		if mode in self.time_modes:
+			self.curr_time_mode = mode
+			self.curr_preset = self.time_modes[self.curr_time_mode]['presets'][0]
+			self.setPreset(self.curr_preset)
+		else:
+			raise Exception('time_mode: "' + mode + '" not found in time_modes"')
+
+	def getSunset(self):
+		time = sun(self.city.observer)['sunset']
+		print('getSunset: (2:00 +) ' + str(time))
+		return Time(time.hour, time.minute, time.second) + Time(2)
+
+	def getSunrise(self):
+		time = sun(self.city.observer)['sunrise']
+		print('getSunrise: (2:00 +) ' + str(time))
+		return Time(time.hour, time.minute, time.second) + Time(2)
+
+	def detectTimeMode(self):
+		now = Time().now()
+		mode = None
+		time = Time()
+
+		for t in self.mode_change_time:
+			if now > self.mode_change_time[t]:
+				if time <= self.mode_change_time[t]:
+					time = self.mode_change_time[t]
+					mode = t
+		
+		if mode is None:
+			for t in self.mode_change_time:
+				if time <= self.mode_change_time[t]:
+					time = self.mode_change_time[t]
+					mode = t
+		
+		self.setTimeMode(mode)
+
+	def getNextTimeMode(self):
+		current = self.mode_change_time[self.curr_time_mode]
+		mode = None
+		time = Time(25)
+
+		for t in self.mode_change_time:
+			if current < self.mode_change_time[t]:
+				if time > self.mode_change_time[t]:
+					time = self.mode_change_time[t]
+					mode = t
+		
+		if mode is None:
+			for t in self.mode_change_time:
+				if time > self.mode_change_time[t]:
+					time = self.mode_change_time[t]
+					mode = t
+		self.next_time_mode = mode
+		return time
+
+	def sceduleOnTime(self, time, func):
+		now = Time().now()
+		if time <= now:
+			time = time + Time(24)
+		delay = time - now + Time(0, 1)
+
+		return self.scheduler.enter(float(delay), 1, func)
+
+	def changeTimeMode(self):
+		self.setTimeMode(self.next_time_mode)
+		time = self.getNextTimeMode()
+
+		if self.time_modes[self.next_time_mode]['astro_args'] is not None:
+			if self.time_modes[self.next_time_mode]['astro_args'] == 'sunrise':
+				self.mode_change_time[self.next_time_mode] = self.getSunrise()
+			elif self.time_modes[self.next_time_mode]['astro_args'] == 'sunset':
+				self.mode_change_time[self.next_time_mode] = self.getSunset()
+			time = self.mode_change_time[self.next_time_mode]
+			print('changeTimeMode: time updated: ' + str(time))
+			
+		print('changeTimeMode sceduled on: ' + str(time))
+		self.sceduleOnTime(time, self.changeTimeMode)
+
+		if self.power != self.PowerMode.OFF:
+			if self.time_modes[self.curr_time_mode]['on_time_preset'] is not None:
+				if self.time_modes[self.curr_time_mode]['on_time_preset'] == 'off':
+					self.setLights( {'power': False, 'transition': self.t_auto_switch})
+					self.power = self.PowerMode.OFF
+				else:
+					self.setPreset(self.time_modes[self.curr_time_mode]['on_time_preset'])
+					self.setLights(self.light_all_payload)
+
 	# Misc
 	def powerON(self):
-		self.setPreset(self.curr_preset)
+		self.setPreset(self.time_modes[self.curr_time_mode]['manual_on_preset'])
 		self.setLights({'power': 'True',} | self.light_all_payload)
-		self.power = self.PowerMode.ON
 
 	def powerOFF(self):
 		self.setLights( {'power': False})
 		self.power = self.PowerMode.OFF
 
+	def autoON(self):
+		pass
+	def autoOFF(self):
+		pass
+	
 	# Callbacks
-	def callback_remote(self, key):
+	def callback_motion(self, key):
+		if key:
+			self.autoON()
+		else:
+			self.autoOFF()
 
+	def callback_remote(self, key):
 		if key == ll.Styrbar.State.UP:
 			if self.power == self.PowerMode.OFF:
 				self.powerON()
 			else:
 				if self.nextPreset():
 					self.setLights(self.light_all_payload)
+			self.power = self.PowerMode.ON
 
 		elif key == ll.Styrbar.State.DOWN:
 			if self.power != self.PowerMode.OFF:
@@ -195,6 +312,7 @@ class Scene:
 			else:
 				if self.nextTemp():
 					self.setLights(self.light_all_payload)
+			self.power = self.PowerMode.ON
 
 		elif key == ll.Styrbar.State.RIGHT:
 			if self.power == self.PowerMode.OFF:
@@ -202,6 +320,7 @@ class Scene:
 			else:
 				if self.prevTemp():
 					self.setLights(self.light_all_payload)
+			self.power = self.PowerMode.ON
 
 		if key == ll.Styrbar.State.UP_HOLD:
 			self.move_lights(brightness=30)
@@ -214,12 +333,15 @@ class Scene:
 
 
 	def run(self):
+		self.motion_sensor.setActionCallback(self.callback_motion)
 		for remote in self.remotes:
 			self.remotes[remote].setActionCallback(self.callback_remote)
 
 		for client in self.add_clients:
 			self.add_clients[client].loop_start()
-		self.main_client.loop_forever()
+		self.main_client.loop_start()
+
+		self.scheduler.run()
 
 f = open('config.json')
 config = json.load(f)
