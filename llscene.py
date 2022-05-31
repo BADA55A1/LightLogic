@@ -241,7 +241,7 @@ class Scene:
 		now = Time().now()
 		if time <= now:
 			time = time + Time(24)
-		delay = time - now + Time(0, 1)
+		delay = time - now + Time(0, 0, 30)
 
 		return self.scheduler.enter(float(delay), 1, func)
 
@@ -267,7 +267,7 @@ class Scene:
 					self.power = self.PowerMode.OFF
 				else:
 					self.setPreset(self.time_modes[self.curr_time_mode]['on_time_preset'])
-					self.setLights(self.light_all_payload)
+					self.setLights(self.light_all_payload | {'transition': self.t_auto_switch})
 
 	# Misc
 	def powerON(self):
@@ -279,9 +279,16 @@ class Scene:
 		self.power = self.PowerMode.OFF
 
 	def autoON(self):
-		pass
+		if self.power == self.PowerMode.OFF:
+			if self.time_modes[self.curr_time_mode]['auto_on_preset'] is not None:
+				self.setPreset(self.time_modes[self.curr_time_mode]['auto_on_preset'])
+				self.setLights({'power': True, 'transition': self.t_auto_switch} | self.light_all_payload)
+				self.power = self.PowerMode.ON_AUTO
+
 	def autoOFF(self):
-		pass
+		if self.power == self.PowerMode.ON_AUTO:
+			self.setLights( {'power': False, 'transition': self.t_auto_switch})
+			self.power = self.PowerMode.OFF
 	
 	# Callbacks
 	def callback_motion(self, key):

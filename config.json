@@ -162,7 +162,7 @@
 	"times": {
 		"manual": 1,
 		"auto_on": 3,
-		"auto_switch": 240,
+		"auto_switch": 120,
 		"motion_off_delay": 300
 	}
 
