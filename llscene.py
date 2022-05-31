@@ -282,12 +282,12 @@ class Scene:
 		if self.power == self.PowerMode.OFF:
 			if self.time_modes[self.curr_time_mode]['auto_on_preset'] is not None:
 				self.setPreset(self.time_modes[self.curr_time_mode]['auto_on_preset'])
-				self.setLights({'power': True, 'transition': self.t_auto_switch} | self.light_all_payload)
+				self.setLights({'power': True, 'transition': self.auto_on} | self.light_all_payload)
 				self.power = self.PowerMode.ON_AUTO
 
 	def autoOFF(self):
 		if self.power == self.PowerMode.ON_AUTO:
-			self.setLights( {'power': False, 'transition': self.t_auto_switch})
+			self.setLights( {'power': False, 'transition': self.auto_on})
 			self.power = self.PowerMode.OFF
 	
 	# Callbacks
